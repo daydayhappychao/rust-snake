@@ -29,6 +29,8 @@ pub enum Direction {
     LEFT = 3,
 }
 
+#[wasm_bindgen]
+#[derive(PartialEq)]
 pub enum Status {
     PENDING = 0,
     RUNNING = 1,
@@ -36,28 +38,50 @@ pub enum Status {
 }
 
 #[wasm_bindgen]
-pub struct BigMap {
+pub struct Game {
     width: usize,
     height: usize,
     blocks: Vec<Block>,
     snake: Vec<usize>,
     walls: Vec<usize>,
-    food: usize,
+    food: Option<usize>,
     direction: Direction,
     status: Status,
 }
 
-impl BigMap {
+#[wasm_bindgen]
+impl Game {
+    pub fn blocks(&self) -> *const Block {
+        self.blocks.as_ptr()
+    }
+
+    fn set_dir(&mut self, next_direction: Direction) {
+        self.direction = next_direction;
+    }
+
+    pub fn set_dir_top(&mut self) {
+        self.set_dir(Direction::TOP);
+    }
+    pub fn set_dir_right(&mut self) {
+        self.set_dir(Direction::RIGHT);
+    }
+    pub fn set_dir_bottom(&mut self) {
+        self.set_dir(Direction::BOTTOM);
+    }
+    pub fn set_dir_left(&mut self) {
+        self.set_dir(Direction::LEFT);
+    }
+
+    pub fn snake(&self) -> *const usize {
+        self.snake.as_ptr()
+    }
+
     fn get_index(&self, x: usize, y: usize) -> usize {
         y * self.width + x
     }
 
     fn get_pos(&self, index: usize) -> (usize, usize) {
         (index / self.width, index % self.width)
-    }
-
-    fn get_block(&self, x: usize, y: usize) -> Block {
-        self.blocks[self.get_index(x, y)]
     }
 
     fn head_next_pos(&self, index: usize) -> (usize, usize) {
@@ -90,13 +114,14 @@ impl BigMap {
 
         // Exclusive range
         let food_pos: usize = rng.gen_range(0..blank_blocks.count());
-        self.food = food_pos;
+        self.food = Some(food_pos);
     }
 
     fn update_snake(&mut self) {
         let last_value = self.snake.last().unwrap().clone();
-        if last_value == self.food {
-            self.snake.push(self.food);
+        if last_value == self.food.unwrap() {
+            self.snake.push(self.food.unwrap());
+            self.gen_food();
         } else if self.failed_check(last_value) {
             self.status = Status::OVER;
         } else {
@@ -107,7 +132,7 @@ impl BigMap {
                     let next_pos = self.head_next_pos(*part);
                     next_snake.push(self.get_index(next_pos.0, next_pos.1));
                 } else {
-                    next_snake.push(self.snake[index + 1]);
+                    next_snake.push(self.snake.get(index + 1).unwrap().clone());
                 }
             }
             self.snake = next_snake;
@@ -122,12 +147,12 @@ impl BigMap {
                 } else if self.snake.contains(&i) {
                     if i == self.snake[0] {
                         Block::TAIL
-                    } else if i == self.snake[2] {
+                    } else if i == self.snake[self.snake.len() - 1] {
                         Block::HEAD
                     } else {
                         Block::BODY
                     }
-                } else if i == self.food {
+                } else if i == self.food.unwrap() {
                     Block::FOOD
                 } else {
                     Block::BLANK
@@ -137,52 +162,36 @@ impl BigMap {
         self.blocks = blocks;
     }
 
-    pub fn start(&mut self) {
-        self.render();
+    pub fn next_tick(&mut self) {
+        if self.status != Status::OVER {
+            match self.food {
+                None => self.gen_food(),
+                Some(_i) => {}
+            }
+            self.update_snake();
+            self.render();
+        }
     }
 
-    pub fn new(width: usize, height: usize, walls: Vec<(usize, usize)>) -> BigMap {
-        let walls_pos: Vec<usize> = walls.iter().map(|w| w.1 * width + w.0).collect();
-
+    pub fn new(width: usize, height: usize, walls: Vec<usize>) -> Game {
         let snake = vec![
-            width * height / 2 - 1,
-            width * height / 2,
-            width * height / 2 + 1,
+            width / 2 + height / 2 * width - 2,
+            width / 2 + height / 2 * width - 1,
+            width / 2 + height / 2 * width,
+            width / 2 + height / 2 * width + 1,
         ];
-
-        let food = width * height / 2 + 4;
 
         let blocks: Vec<Block> = (0..width * height).map(|_index| Block::BLANK).collect();
 
-        BigMap {
+        Game {
             width,
             height,
             blocks,
             snake,
-            food,
             direction: Direction::RIGHT,
             status: Status::PENDING,
-            walls: walls_pos,
+            walls,
+            food: None,
         }
-    }
-}
-
-#[wasm_bindgen]
-pub fn greet(name: &str) {
-    alert(&format!("Hello, {}!", name));
-}
-
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
     }
 }
