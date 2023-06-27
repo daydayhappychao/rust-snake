@@ -2,7 +2,7 @@ import { Game, Status, Block } from "hungry-snake";
 import { memory } from "hungry-snake/hungry_snake_bg.wasm";
 
 const width = 40;
-const height = 50;
+const height = 80;
 
 const wallsArr = [];
 for (let i = 0; i < width; i++) {
@@ -12,6 +12,16 @@ for (let i = 0; i < width; i++) {
     }
   }
 }
+for (let i = 5; i < 35; i++) {
+  wallsArr.push(i + 10 * width);
+}
+for (let i = 5; i < 35; i++) {
+  wallsArr.push(i + 11 * width);
+}
+for (let i = 11; i < 60; i++) {
+  wallsArr.push(5 + i * width);
+}
+
 const walls = new Uint32Array(wallsArr);
 
 const game = Game.new(width, height, walls);
@@ -58,9 +68,6 @@ const drawCells = () => {
   const blockPtr = game.blocks();
 
   const cells = new Uint8Array(memory.buffer, blockPtr, width * height);
-  const snakePtr = game.snake();
-  const snake = new Uint32Array(memory.buffer, snakePtr, 4);
-  console.log(snake);
   ctx.beginPath();
 
   for (let row = 0; row < height; row++) {
@@ -97,7 +104,34 @@ const renderLoop = () => {
 
   drawGrid();
   drawCells();
-
-//   requestAnimationFrame(renderLoop);
+  console.log(game.status());
+  setTimeout(renderLoop, 100);
 };
+
+window.addEventListener(
+  "keydown",
+  function (event) {
+    if (event.code === "ArrowUp") {
+      game.set_dir_top();
+    }
+    if (event.code === "ArrowDown") {
+      game.set_dir_bottom();
+    }
+    if (event.code === "ArrowLeft") {
+      game.set_dir_left();
+    }
+    if (event.code === "ArrowRight") {
+      game.set_dir_right();
+    }
+    if (event.code === "Space") {
+      if (game.status() === "PENDING") {
+        game.start();
+      } else {
+        game.pause();
+      }
+    }
+  },
+  true
+);
+
 renderLoop();
